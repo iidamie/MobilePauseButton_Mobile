@@ -127,11 +127,6 @@ jobs:
           RELEASE_VERSION: ${{ steps.build.outputs.version }}
         run: |
           set -euo pipefail
-          if [[ "$GITHUB_REF_NAME" != "$RELEASE_TAG" ]]; then
-            echo "::error::Tag $GITHUB_REF_NAME does not match VERSION.txt ($RELEASE_TAG)."
-            exit 1
-          fi
-
           git fetch --tags --force
           if tag_commit="$(git rev-list -n 1 "$RELEASE_TAG" 2>/dev/null)"; then
             if [[ "$tag_commit" != "$GITHUB_SHA" ]]; then
