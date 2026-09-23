@@ -1,0 +1,42 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>MobilePauseButton</AssemblyName>
+    <RootNamespace>MobilePauseButton.Mobile</RootNamespace>
+    <Version>1.6.0</Version>
+    <InformationalVersion>1.6.0</InformationalVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <Optimize>true</Optimize>
+    <DebugType>embedded</DebugType>
+    <Deterministic>true</Deterministic>
+
+    <CSharpManagerRoot Condition="'$(CSharpManagerRoot)' == ''">$(MSBuildThisFileDirectory)../../StArray.ModManager-csharp</CSharpManagerRoot>
+    <CSharpManagerAssembly>$(CSharpManagerRoot)/artifacts/StArray.ModManager.dll</CSharpManagerAssembly>
+    <CSharpManagerAnalyzer>$(CSharpManagerRoot)/StArray.ModManager.Analyzer/bin/Release/netstandard2.0/StArray.ModManager.Analyzer.dll</CSharpManagerAnalyzer>
+    <CSharpImGuiAssembly>$(CSharpManagerRoot)/artifacts/ImGui.NET.dll</CSharpImGuiAssembly>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Analyzer Include="$(CSharpManagerAnalyzer)" Condition="Exists('$(CSharpManagerAnalyzer)')" />
+    <Reference Include="StArray.ModManager" Condition="Exists('$(CSharpManagerAssembly)')">
+      <HintPath>$(CSharpManagerAssembly)</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="StArray.ModManager" Condition="!Exists('$(CSharpManagerAssembly)')">
+      <HintPath>../References/StArray.ModManager.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="ImGui.NET" Condition="Exists('$(CSharpImGuiAssembly)')">
+      <HintPath>$(CSharpImGuiAssembly)</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="ImGui.NET" Condition="!Exists('$(CSharpImGuiAssembly)')">
+      <HintPath>../References/ImGui.NET.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+</Project>

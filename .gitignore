@@ -1,0 +1,15 @@
+# Local build output
+**/bin/
+**/obj/
+tmp_package/
+__pycache__/
+
+# Distribution bundles are uploaded as GitHub Release assets
+*.zip
+
+# Local logs and compile-only references
+logcat-output*.txt
+*.log
+References/*.dll
+References/*.pdb
+References/*.xml

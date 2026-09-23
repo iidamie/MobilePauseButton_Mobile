@@ -1,0 +1,151 @@
+name: Build and release MobilePauseButton
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
+    paths:
+      - "MobilePlugin/**"
+      - "README.md"
+      - "VERSION.txt"
+      - "package_mod.py"
+      - ".gitignore"
+      - ".github/workflows/release.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: mobile-pause-button-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  MOD_MANAGER_REPOSITORY: StArraySharp/StArray.ModManager
+  MOD_MANAGER_REF: main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout MobilePauseButton
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Checkout StArray Mod Manager
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.MOD_MANAGER_REPOSITORY }}
+          ref: ${{ env.MOD_MANAGER_REF }}
+          path: dependencies/StArray.ModManager
+
+      - name: Build manager references
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          manager_root="$GITHUB_WORKSPACE/dependencies/StArray.ModManager"
+          dotnet build \
+            "$manager_root/StArray.ModManager.Analyzer/StArray.ModManager.Analyzer.csproj" \
+            --configuration Release
+          dotnet build \
+            "$manager_root/StArray.ModManager/StArray.ModManager.csproj" \
+            --configuration Release
+
+          core_output="$manager_root/StArray.ModManager/bin/Release/net10.0"
+          analyzer_output="$manager_root/StArray.ModManager.Analyzer/bin/Release/netstandard2.0"
+          imgui_dll="$(find "$HOME/.nuget/packages/imgui.net" \
+            -path '*/lib/net8.0/ImGui.NET.dll' -type f | sort -V | tail -n 1)"
+
+          test -f "$core_output/StArray.ModManager.dll"
+          test -f "$analyzer_output/StArray.ModManager.Analyzer.dll"
+          test -f "$imgui_dll"
+
+          mkdir -p "$manager_root/artifacts"
+          cp "$core_output/StArray.ModManager.dll" "$manager_root/artifacts/StArray.ModManager.dll"
+          cp "$imgui_dll" "$manager_root/artifacts/ImGui.NET.dll"
+
+      - name: Build mod
+        id: build
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(tr -d '\r\n' < VERSION.txt)"
+          test -n "$version"
+
+          dotnet build MobilePlugin/MobilePauseButton.csproj \
+            --configuration Release \
+            -p:Version="$version" \
+            -p:InformationalVersion="$version" \
+            -p:CSharpManagerRoot="$GITHUB_WORKSPACE/dependencies/StArray.ModManager"
+
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Package and validate
+        id: package
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${{ steps.build.outputs.version }}"
+          package="MobilePauseButton-$version.zip"
+
+          python3 package_mod.py
+          test -f "$package"
+          unzip -t "$package"
+          test "$(unzip -Z1 "$package")" = "MobilePauseButton/MobilePauseButton.dll"
+
+          echo "package=$package" >> "$GITHUB_OUTPUT"
+          echo "tag=v$version" >> "$GITHUB_OUTPUT"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: MobilePauseButton-${{ steps.build.outputs.version }}-${{ github.run_number }}
+          path: ${{ steps.package.outputs.package }}
+          if-no-files-found: error
+
+      - name: Create or update GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ steps.package.outputs.tag }}
+          RELEASE_PACKAGE: ${{ steps.package.outputs.package }}
+          RELEASE_VERSION: ${{ steps.build.outputs.version }}
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REF_NAME" != "$RELEASE_TAG" ]]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match VERSION.txt ($RELEASE_TAG)."
+            exit 1
+          fi
+
+          git fetch --tags --force
+          tag_commit="$(git rev-list -n 1 "$RELEASE_TAG")"
+          if [[ "$tag_commit" != "$GITHUB_SHA" ]]; then
+            echo "::error::Tag $RELEASE_TAG points to $tag_commit, not $GITHUB_SHA."
+            exit 1
+          fi
+
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" "$RELEASE_PACKAGE" --clobber
+          else
+            gh release create "$RELEASE_TAG" "$RELEASE_PACKAGE" \
+              --verify-tag \
+              --title "Mobile Pause & Menu Buttons $RELEASE_VERSION" \
+              --generate-notes
+          fi
