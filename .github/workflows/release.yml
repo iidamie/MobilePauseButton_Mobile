@@ -4,8 +4,6 @@ on:
   push:
     branches:
       - main
-    tags:
-      - "v*"
     paths:
       - "MobilePlugin/**"
       - "README.md"
@@ -119,7 +117,7 @@ jobs:
           if-no-files-found: error
 
       - name: Create or update GitHub Release
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: github.ref == 'refs/heads/main'
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
@@ -135,17 +133,23 @@ jobs:
           fi
 
           git fetch --tags --force
-          tag_commit="$(git rev-list -n 1 "$RELEASE_TAG")"
-          if [[ "$tag_commit" != "$GITHUB_SHA" ]]; then
-            echo "::error::Tag $RELEASE_TAG points to $tag_commit, not $GITHUB_SHA."
-            exit 1
+          if tag_commit="$(git rev-list -n 1 "$RELEASE_TAG" 2>/dev/null)"; then
+            if [[ "$tag_commit" != "$GITHUB_SHA" ]]; then
+              echo "::notice::Release $RELEASE_TAG already points to another commit; bump VERSION.txt to publish a new release."
+              exit 0
+            fi
           fi
 
           if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
             gh release upload "$RELEASE_TAG" "$RELEASE_PACKAGE" --clobber
-          else
+          elif git rev-parse --verify --quiet "refs/tags/$RELEASE_TAG" >/dev/null; then
             gh release create "$RELEASE_TAG" "$RELEASE_PACKAGE" \
               --verify-tag \
+              --title "Mobile Pause & Menu Buttons $RELEASE_VERSION" \
+              --generate-notes
+          else
+            gh release create "$RELEASE_TAG" "$RELEASE_PACKAGE" \
+              --target "$GITHUB_SHA" \
               --title "Mobile Pause & Menu Buttons $RELEASE_VERSION" \
               --generate-notes
           fi
