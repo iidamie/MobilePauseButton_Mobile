@@ -17,6 +17,8 @@
 
 其他游戏版本或官方移动版不在支持范围内。
 
+当前 1.6.0 为预发布版本。构建与安装包检查已通过，但设备启动兼容性仍待验证。
+
 ## 安装
 
 1. 从 [Releases](https://github.com/iidamie/MobilePauseButton_Mobile/releases) 下载最新的 `MobilePauseButton-x.y.z.zip`。
